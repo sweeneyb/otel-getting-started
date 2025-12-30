@@ -1,0 +1,93 @@
+# /tmp/otel-collector-config.yaml
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+exporters:
+  # NOTE: Prior to v0.86.0 use `logging` instead of `debug`.
+  debug:
+    verbosity: detailed
+  googlecloud:
+    log:
+      default_log_name: opentelemetry.io/collector-exported-log
+  googlemanagedprometheus:
+    sending_queue:
+      # batch metrics before sending to reduce API usage
+      batch:
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 65
+    spike_limit_percentage: 20
+  resourcedetection:
+      # detect cluster name and location
+      detectors: [gcp]
+      timeout: 10s
+  transform:
+    # "location", "cluster", "namespace", "job", "instance", and "project_id" are reserved, and 
+    # metrics containing these labels will be rejected.  Prefix them with exported_ to prevent this.
+    metric_statements:
+    - context: datapoint
+      statements:
+      - set(attributes["exported_location"], attributes["location"])
+      - delete_key(attributes, "location")
+      - set(attributes["exported_cluster"], attributes["cluster"])
+      - delete_key(attributes, "cluster")
+      - set(attributes["exported_namespace"], attributes["namespace"])
+      - delete_key(attributes, "namespace")
+      - set(attributes["exported_job"], attributes["job"])
+      - delete_key(attributes, "job")
+      - set(attributes["exported_instance"], attributes["instance"])
+      - delete_key(attributes, "instance")
+      - set(attributes["exported_project_id"], attributes["project_id"])
+      - delete_key(attributes, "project_id")
+connectors:
+  spanmetrics:
+    histogram:
+      dimensions:
+        - name: url.scheme
+          default: https
+      explicit:
+        buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms]  
+    dimensions:
+      - name: http.method
+        default: GET
+      - name: http.status_code
+    calls_dimensions:
+      - name: http.url
+        default: /ping
+    exemplars:
+      enabled: true
+    exclude_dimensions: ['status.code']
+    aggregation_temporality: "AGGREGATION_TEMPORALITY_CUMULATIVE"    
+    metrics_flush_interval: 15s
+    metrics_expiration: 5m
+    events:
+      enabled: true
+      dimensions:
+        - name: exception.type
+        - name: exception.message
+    resource_metrics_key_attributes:
+      - service.name
+      - telemetry.sdk.language
+      - telemetry.sdk.name
+    include_instrumentation_scope:
+      - express
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter]
+      exporters: [debug, googlecloud, spanmetrics]
+    metrics:
+      receivers: [spanmetrics]
+      processors: [memory_limiter, transform]
+      exporters: [debug, googlemanagedprometheus]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter]
+      exporters: [debug, googlecloud]

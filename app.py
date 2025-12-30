@@ -5,7 +5,7 @@ import logging
 from opentelemetry import trace, metrics
 
 # Acquire a tracer
-tracer = trace.get_tracer("diceroller.tracer")
+tracer = trace.get_tracer("diceroller.tracer2")
 meter = metrics.get_meter("dicecontroller.meter")
 
 roll_counter = meter.create_counter(
