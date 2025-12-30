@@ -70,3 +70,5 @@ podman run -p 4317:4317 \
     --config=/etc/otel-collector-config.yaml
 ```
 
+# License
+This repository contains code licensed under Creative Commons Attribution 4.0 International and Apache 2.0.  
